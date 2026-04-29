@@ -37,12 +37,12 @@ jobs:
           mkdir -p output
 
           declare -A list=(
-            ["multi-light"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.light.txt"
-            ["multi-pro-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.pro.mini.txt"
-            ["multi-pro-full"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.pro.txt"
+            ["multi-light"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/light.txt"
+            ["multi-pro-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.mini.txt"
+            ["multi-pro-full"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.txt"
             ["tif-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.mini.txt"
-            ["gambling-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.mini.txt"
-            ["gambling-medium"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.medium.txt"
+            ["gambling"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.txt"
+            ["gambling-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling-onlydomains.txt"
             ["nsfw"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/nsfw.txt"
             ["native-tracker"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/native.trackers.txt"
             ["popupads"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/popupads.txt"
@@ -52,9 +52,6 @@ jobs:
           for tag in "${!list[@]}"; do
             echo "=== Processing: $tag ==="
             curl -sL "${list[$tag]}" -o raw.txt
-            echo "--- RAW CONTENT ---"
-            head -10 raw.txt
-            echo "--- END RAW ---"
             
             TAG=$tag python3 scripts/parse.py
             if [ $? -ne 0 ]; then
