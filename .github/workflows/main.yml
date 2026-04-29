@@ -1,35 +1,40 @@
 name: Sing-Box Rule-Set Database
+
 on:
   schedule:
-    - cron: '0 0 1,15 * *' # Update 2 minggu sekali (tanggal 1 & 15)
+    - cron: '0 0 1,15 * *'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Sing-Box
         run: |
-          # Mengambil versi terbaru sing-box (Linux amd64)
-          curl -sL https://api.github.com/repos/SagerNet/sing-box/releases/latest \
-          | grep "browser_download_url.*linux-amd64.tar.gz" \
-          | cut -d : -f 2,3 \
-          | tr -d \" \
-          | wget -qi -
-          
-          # Ekstrak dan pindahkan ke /usr/local/bin
-          tar -xvf sing-box-*-linux-amd64.tar.gz
+          DOWNLOAD_URL=$(curl -sL https://api.github.com/repos/SagerNet/sing-box/releases/latest \
+            | grep "browser_download_url.*linux-amd64.tar.gz" \
+            | grep -v "sha256" \
+            | head -n1 \
+            | cut -d '"' -f 4)
+
+          echo "Downloading: $DOWNLOAD_URL"
+          wget -q "$DOWNLOAD_URL" -O sing-box.tar.gz
+
+          tar -xf sing-box.tar.gz
           sudo mv sing-box-*-linux-amd64/sing-box /usr/local/bin/
-          
-          # Cek apakah sudah terinstall
           sing-box version
 
       - name: Process Rules
         run: |
           mkdir -p output
+
           declare -A list=(
             ["multi-light"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.light.txt"
             ["multi-pro-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.pro.mini.txt"
@@ -44,25 +49,65 @@ jobs:
           )
 
           for tag in "${!list[@]}"; do
-            echo "Compiling $tag..."
+            echo "Processing: $tag"
             curl -sL "${list[$tag]}" -o raw.txt
-            python3 -c "
-            import json
-            with open('raw.txt', 'r') as f:
-                domains = sorted(list(set(l.strip() for l in f if l.strip() and not l.startswith(('#', '!')))))
-            with open('rule.json', 'w') as f:
-                json.dump({'version': 1, 'rules': [{'domain_suffix': domains}]}, f)
-            "
+
+            python3 - <<'EOF'
+          import json, sys
+
+          with open('raw.txt', 'r') as f:
+              raw_lines = f.readlines()
+
+          domains = []
+          for line in raw_lines:
+              line = line.strip()
+              # Skip komentar dan baris kosong
+              if not line or line.startswith('#') or line.startswith('!'):
+                  continue
+              # Strip prefix wildcard: "*.domain.com" -> "domain.com"
+              if line.startswith('*.'):
+                  line = line[2:]
+              # Validasi minimal ada titik (bukan TLD doang)
+              if '.' in line:
+                  domains.append(line)
+
+          domains = sorted(set(domains))
+          print(f"  Total domains: {len(domains)}")
+
+          rule = {
+              "version": 1,
+              "rules": [{"domain_suffix": domains}]
+          }
+
+          with open('rule.json', 'w') as f:
+              json.dump(rule, f)
+          EOF
+
             sing-box rule-set compile rule.json -o "output/$tag.srs"
-            rm raw.txt rule.json
+            echo "  Compiled: output/$tag.srs"
+            rm -f raw.txt rule.json
           done
 
-      - name: Deploy to Branch
+      - name: Deploy to Release Branch
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git checkout -b release || git checkout release
+
+          # Fetch dan setup branch release
+          git fetch origin
+
+          if git ls-remote --exit-code --heads origin release; then
+            git checkout release
+          else
+            git checkout --orphan release
+            git rm -rf . --quiet || true
+          fi
+
+          # Pindahkan hasil compile
           mv output/*.srs .
+
           git add *.srs
-          git commit -m "Update DB Rules: $(date)" || echo "No changes"
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+          git commit -m "Update DB Rules: $(date +'%Y-%m-%d %H:%M UTC')"
           git push origin release --force
