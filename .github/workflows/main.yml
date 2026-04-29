@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Sing-Box
         run: |
@@ -26,7 +28,6 @@ jobs:
 
           echo "Downloading: $DOWNLOAD_URL"
           wget -q "$DOWNLOAD_URL" -O sing-box.tar.gz
-
           tar -xf sing-box.tar.gz
           sudo mv sing-box-*-linux-amd64/sing-box /usr/local/bin/
           sing-box version
@@ -49,7 +50,7 @@ jobs:
           )
 
           for tag in "${!list[@]}"; do
-            echo "Processing: $tag"
+            echo "=== Processing: $tag ==="
             curl -sL "${list[$tag]}" -o raw.txt
 
             python3 - <<'EOF'
@@ -61,53 +62,51 @@ jobs:
           domains = []
           for line in raw_lines:
               line = line.strip()
-              # Skip komentar dan baris kosong
               if not line or line.startswith('#') or line.startswith('!'):
                   continue
-              # Strip prefix wildcard: "*.domain.com" -> "domain.com"
               if line.startswith('*.'):
                   line = line[2:]
-              # Validasi minimal ada titik (bukan TLD doang)
-              if '.' in line:
+              if '.' in line and not line.startswith('.'):
                   domains.append(line)
 
           domains = sorted(set(domains))
-          print(f"  Total domains: {len(domains)}")
+          print(f"  Unique domains: {len(domains)}")
 
-          rule = {
-              "version": 1,
-              "rules": [{"domain_suffix": domains}]
-          }
+          if not domains:
+              print("  WARNING: No domains found!")
+              sys.exit(1)
 
           with open('rule.json', 'w') as f:
-              json.dump(rule, f)
+              json.dump({"version": 1, "rules": [{"domain_suffix": domains}]}, f)
           EOF
 
+            if [ $? -ne 0 ]; then
+              echo "  SKIP: parsing gagal untuk $tag"
+              continue
+            fi
+
             sing-box rule-set compile rule.json -o "output/$tag.srs"
-            echo "  Compiled: output/$tag.srs"
+            echo "  OK: output/$tag.srs"
             rm -f raw.txt rule.json
           done
 
-      - name: Deploy to Release Branch
+          ls -lh output/
+
+      - name: Commit & Push to Main
         run: |
+          # Copy semua .srs ke root repo (atau subfolder, sesuai selera)
+          cp output/*.srs .
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          # Fetch dan setup branch release
-          git fetch origin
-
-          if git ls-remote --exit-code --heads origin release; then
-            git checkout release
-          else
-            git checkout --orphan release
-            git rm -rf . --quiet || true
-          fi
-
-          # Pindahkan hasil compile
-          mv output/*.srs .
-
           git add *.srs
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git status
 
-          git commit -m "Update DB Rules: $(date +'%Y-%m-%d %H:%M UTC')"
-          git push origin release --force
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan."
+          else
+            git commit -m "chore: update rule-sets $(date +'%Y-%m-%d')"
+            git push origin main
+            echo "Push ke main berhasil!"
+          fi
