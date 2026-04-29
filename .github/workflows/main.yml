@@ -13,7 +13,19 @@ jobs:
 
       - name: Install Sing-Box
         run: |
-          bash <(curl -L https://raw.githubusercontent.com/SagerNet/sing-box/main/install.sh)
+          # Mengambil versi terbaru sing-box (Linux amd64)
+          curl -sL https://api.github.com/repos/SagerNet/sing-box/releases/latest \
+          | grep "browser_download_url.*linux-amd64.tar.gz" \
+          | cut -d : -f 2,3 \
+          | tr -d \" \
+          | wget -qi -
+          
+          # Ekstrak dan pindahkan ke /usr/local/bin
+          tar -xvf sing-box-*-linux-amd64.tar.gz
+          sudo mv sing-box-*-linux-amd64/sing-box /usr/local/bin/
+          
+          # Cek apakah sudah terinstall
+          sing-box version
 
       - name: Process Rules
         run: |
