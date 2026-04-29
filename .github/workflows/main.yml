@@ -53,40 +53,14 @@ jobs:
             echo "=== Processing: $tag ==="
             curl -sL "${list[$tag]}" -o raw.txt
 
-            python3 - <<'EOF'
-          import json, sys
-
-          with open('raw.txt', 'r') as f:
-              raw_lines = f.readlines()
-
-          domains = []
-          for line in raw_lines:
-              line = line.strip()
-              if not line or line.startswith('#') or line.startswith('!'):
-                  continue
-              if line.startswith('*.'):
-                  line = line[2:]
-              if '.' in line and not line.startswith('.'):
-                  domains.append(line)
-
-          domains = sorted(set(domains))
-          print(f"  Unique domains: {len(domains)}")
-
-          if not domains:
-              print("  WARNING: No domains found!")
-              sys.exit(1)
-
-          with open('rule.json', 'w') as f:
-              json.dump({"version": 1, "rules": [{"domain_suffix": domains}]}, f)
-          EOF
-
+            TAG=$tag python3 .github/scripts/parse.py
             if [ $? -ne 0 ]; then
-              echo "  SKIP: parsing gagal untuk $tag"
+              echo "  SKIP: $tag"
               continue
             fi
 
             sing-box rule-set compile rule.json -o "output/$tag.srs"
-            echo "  OK: output/$tag.srs"
+            echo "  OK: $(du -sh output/$tag.srs | cut -f1)"
             rm -f raw.txt rule.json
           done
 
@@ -94,15 +68,12 @@ jobs:
 
       - name: Commit & Push to Main
         run: |
-          # Copy semua .srs ke root repo (atau subfolder, sesuai selera)
           cp output/*.srs .
 
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
           git add *.srs
-          git status
-
           if git diff --cached --quiet; then
             echo "Tidak ada perubahan."
           else
