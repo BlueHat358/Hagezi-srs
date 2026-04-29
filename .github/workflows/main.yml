@@ -53,7 +53,7 @@ jobs:
             echo "=== Processing: $tag ==="
             curl -sL "${list[$tag]}" -o raw.txt
 
-            TAG=$tag python3 .github/scripts/parse.py
+            TAG=$tag python3 scripts/parse.py
             if [ $? -ne 0 ]; then
               echo "  SKIP: $tag"
               continue
