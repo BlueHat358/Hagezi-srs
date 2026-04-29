@@ -1,0 +1,56 @@
+name: Sing-Box Rule-Set Database
+on:
+  schedule:
+    - cron: '0 0 1,15 * *' # Update 2 minggu sekali (tanggal 1 & 15)
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Sing-Box
+        run: |
+          bash <(curl -L https://raw.githubusercontent.com/SagerNet/sing-box/main/install.sh)
+
+      - name: Process Rules
+        run: |
+          mkdir -p output
+          declare -A list=(
+            ["multi-light"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.light.txt"
+            ["multi-pro-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.pro.mini.txt"
+            ["multi-pro-full"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.pro.txt"
+            ["tif-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.mini.txt"
+            ["gambling-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.mini.txt"
+            ["gambling-medium"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.medium.txt"
+            ["nsfw"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/nsfw.txt"
+            ["native-tracker"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/native.trackers.txt"
+            ["popupads"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/popupads.txt"
+            ["fake"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/fake.txt"
+          )
+
+          for tag in "${!list[@]}"; do
+            echo "Compiling $tag..."
+            curl -sL "${list[$tag]}" -o raw.txt
+            python3 -c "
+            import json
+            with open('raw.txt', 'r') as f:
+                domains = sorted(list(set(l.strip() for l in f if l.strip() and not l.startswith(('#', '!')))))
+            with open('rule.json', 'w') as f:
+                json.dump({'version': 1, 'rules': [{'domain_suffix': domains}]}, f)
+            "
+            sing-box rule-set compile rule.json -o "output/$tag.srs"
+            rm raw.txt rule.json
+          done
+
+      - name: Deploy to Branch
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout -b release || git checkout release
+          mv output/*.srs .
+          git add *.srs
+          git commit -m "Update DB Rules: $(date)" || echo "No changes"
+          git push origin release --force
