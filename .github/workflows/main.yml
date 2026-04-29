@@ -48,11 +48,14 @@ jobs:
             ["popupads"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/popupads.txt"
             ["fake"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/fake.txt"
           )
-
+          
           for tag in "${!list[@]}"; do
             echo "=== Processing: $tag ==="
             curl -sL "${list[$tag]}" -o raw.txt
-
+            echo "--- RAW CONTENT ---"
+            head -10 raw.txt
+            echo "--- END RAW ---"
+            
             TAG=$tag python3 scripts/parse.py
             if [ $? -ne 0 ]; then
               echo "  SKIP: $tag"
