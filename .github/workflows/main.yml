@@ -42,6 +42,8 @@ jobs:
             ["multi-pro-full"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.txt"
             ["multi-ultimate"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/ultimate.txt"
             ["tif-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.mini.txt"
+            ["tif-medium"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.medium.txt"
+            ["tif-full"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.txt"
             ["gambling"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling.txt"
             ["gambling-mini"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/gambling-onlydomains.txt"
             ["nsfw"]="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/nsfw.txt"
